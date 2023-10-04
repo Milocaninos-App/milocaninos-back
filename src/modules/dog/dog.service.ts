@@ -1,26 +1,70 @@
-import { Injectable } from '@nestjs/common';
-import { CreateDogDto } from './dto/create-dog.dto';
-import { UpdateDogDto } from './dto/update-dog.dto';
+import { BadRequestException, Injectable, InternalServerErrorException } from '@nestjs/common';
+import { InjectModel } from '@nestjs/mongoose';
+import { AnyObject, Model } from 'mongoose';
+import { CreateDogDto, UpdateDogDto } from './dto';
+import { Dog } from './entities/dog.entity';
 
 @Injectable()
 export class DogService {
-  create(createDogDto: CreateDogDto) {
-    return 'This action adds a new dog';
+  constructor(
+    @InjectModel(Dog.name)
+    private dogModel: Model<Dog>,
+  ) { }
+
+  async create(createDogDto: CreateDogDto): Promise<Dog> {
+    try {
+      const dog = new this.dogModel(createDogDto);
+      await dog.save();
+
+      return dog;
+    } catch (error) {
+      if (error.code === 11000) {
+        throw new BadRequestException(`${createDogDto.name} already exists!`);
+      }
+
+      throw new InternalServerErrorException(error);
+    }
   }
 
-  findAll() {
-    return `This action returns all dog`;
+  async update(id: string, updateDogDto: UpdateDogDto): Promise<Dog> {
+    try {
+      const dog = await this.dogModel.findByIdAndUpdate(id, updateDogDto, { new: true });
+
+      return dog;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
-  findOne(id: number) {
-    return `This action returns a #${id} dog`;
+  async findAll(): Promise<Dog[]> {
+    try {
+      const dogs = await this.dogModel.find();
+
+      if (dogs) {
+        return dogs;
+      }
+
+      return [];
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
-  update(id: number, updateDogDto: UpdateDogDto) {
-    return `This action updates a #${id} dog`;
+  async findOne(id: string): Promise<Dog> {
+    try {
+      const dog = await this.dogModel.findOne({ _id: id });
+
+      return dog;
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 
-  remove(id: number) {
-    return `This action removes a #${id} dog`;
+  remove(id: string): Promise<AnyObject> {
+    try {
+      return this.dogModel.deleteOne({ _id: id });
+    } catch (error) {
+      throw new InternalServerErrorException(error);
+    }
   }
 }
